@@ -1,0 +1,235 @@
+#!/bin/bash
+#
+# SIA BackEnd server
+#
+#
+APP_NAME="siabe"
+APP_DESC="SIA BackEnd - SIA management REST Api"
+APP_VERS="0.0.1"
+APP_PORT="18080"
+APP_USER="sia" 
+APP_HOME="/var/lib/siabe"
+PID_FILE="/var/run/siabe/siabe.pid"
+LOG_FILE="/var/log/siabe/siabe.log"
+LIB_DIR="/var/lib/siabe/lib" 
+MAIN_CLASS="com.oneandone.relesia.server.BEServer"
+JAVA_OPTS="-Xms256m -Xmx2g -XX:PermSize=64m -XX:MaxPermSize=256m" JAVA_BIN=$(which java) 
+AUTHBIND_BIN=$(which authbind)
+
+# Read default configuration that might overwite any of the above variables
+[ -r /etc/default/$APP_NAME ] && . /etc/default/$APP_NAME
+
+##############################################################################
+# Helper functions
+##############################################################################
+die () {
+  RETCODE=$1
+  shift
+  echo "$@" >&2
+  exit $RETCODE;
+}
+
+get_listening_pid() {
+  lsof -t -i:$APP_PORT -sTCP:listen | xargs echo;
+}
+
+##############################################################################
+# Start and daemonize the service process
+##############################################################################
+do_start() {
+  # Return codes:
+  # - 0: Service has been started and daemonized
+  # - 1: Service is already started
+  # - 2: Service could not be started
+
+  # Check invoked by 
+  # root
+  if ! [ $(id -u) = 0 ]; then
+     die 2 "ERROR: You need to be root in order to start and daemonize $APP_NAME";
+  fi
+
+  # Check run disabled
+  if ! [ "$START_DAEMON" = "1" ] ; then
+    die 2 "ABORT: /etc/default/$APP_NAME isn't set to START_DAEMON=1";
+  fi
+
+  # Check service user
+  getent passwd $APP_USER 1> /dev/null 2>&1;
+  if [ $? -ne 0 ]; then
+    die 2 "ERROR: Service user not found: $APP_USER";
+  fi
+
+  # Check pid file already exists
+  if [ -f $PID_FILE ]; then
+    read ppid < $PID_FILE
+
+    # Check service process is still alive
+    if ps -p "$ppid" -o "pid=" >/dev/null 2>&1; then
+      die 1 "Service $APP_NAME is already running (#$ppid)";
+    fi
+
+    # Remove zombie pid file
+    rm -f $PID_FILE;
+  fi
+
+  # Check listen port is already used
+  lpid=$(get_listening_pid)
+  if [[ $lpid != "" ]]; then
+    die 2 "Port $APP_PORT is already in use by another process (#$lpid)";
+  fi
+
+  # Prepare pid file
+  mkdir -p $(dirname $PID_FILE)
+  cat /dev/null > $PID_FILE
+  chown $APP_USER:$APP_USER $PID_FILE
+
+  # Prepare log file
+  mkdir -p $(dirname $LOG_FILE)
+  touch $LOG_FILE > /dev/null
+  chown $APP_USER:$APP_USER $LOG_FILE
+
+  # Prepare home directory
+  mkdir -p $APP_HOME
+  chown $APP_USER:$APP_USER $APP_HOME
+  AUTHBIND_CMD=""
+  if [ 1024 -ge $APP_PORT ]; then
+    AUTHBIND_CMD=" $AUTHBIND_BIN --deep "
+  fi
+
+  # Start service and put in in the background "And I'll just fade away" --River Tam
+  cd $APP_HOME
+  su $APP_USER \
+    -s /bin/bash \
+    -c "nohup $AUTHBIND_CMD $JAVA_BIN $JAVA_OPTS -classpath \"$LIB_DIR/*\" $MAIN_CLASS >> $LOG_FILE 2>&1 & echo \$! > $PID_FILE"
+
+  # Check progress every second for 60 seconds
+  sleep 1
+  count=0
+  while [ $count -lt 60 ]; do
+
+    # Is service listening on the specified port?
+    lpid=$(get_listening_pid)
+    if [[ $lpid != "" ]]; then
+      die 0 "Service $APP_NAME was successfully started and daemonized (#$lpid)";
+    fi
+    # At least, is the service process still running?
+    read ppid < $PID_FILE
+    if ! ps -p "$ppid" -o "pid=" >/dev/null 2>&1; then
+      rm -f $PID_FILE
+      die 2 "Service $APP_NAME failed to start; process (#$ppid) was terminated before listening on port $APP_PORT";
+    fi
+
+    # Keep waiting
+    sleep 1
+    let count=$count+1;
+  done
+
+  # Failed
+  read ppid < $PID_FILE
+  die 2 "Service $APP_NAME was started (#$ppid) but nobody is listening on port $APP_PORT after 30 seconds";
+}
+
+##############################################################################
+# Start and display service output
+##############################################################################
+do_interactive () {
+  # Check if port is already in use
+  lpid=$(get_listening_pid)
+  if [[ $lpid != "" ]]; then
+    die 2 "ERROR: Port $APP_PORT is already in use by process #$lpid";
+  fi
+  # Start service process
+  echo "Starting $APP_DESC v$APP_VERS ..."
+  $JAVA_BIN $JAVA_OPTS -classpath "$LIB_DIR/*" $MAIN_CLASS;
+}
+
+##############################################################################
+# Stop the service process
+##############################################################################
+do_stop () {
+  # Return codes - 0: Service has been stopped - 1: Service is already stopped - 2: Service could not be stopped Check invoked by root
+  if ! [ $(id -u) = 0 ]; then
+     die 2 "ERROR: You need to be root in order to stop $APP_NAME";
+  fi
+
+  # Check no pidfile
+  if [ ! -f $PID_FILE ]; then
+
+    # If port is in use; kill that running process
+    lpid=$(get_listening_pid)
+    if [[ $lpid != "" ]]; then
+      kill -SIGKILL $lpid > /dev/null 2>&1
+      die 1 "Pidfile not found ($PID_FILE) but process #$lpid is still listening on port $APP_PORT; killed it.";
+    fi
+    die 1 "Service $APP_NAME is not running"
+  fi
+
+  # Send SIGTERM signal
+  read ppid < $PID_FILE
+  kill -SIGTERM $ppid > /dev/null 2>&1
+
+  # Check progress every second for 30 seconds
+  count=0
+  while [ $count -lt 30 ]; do
+    # Is it dead yet?
+    if ! ps -p "$ppid" -o "pid=" >/dev/null 2>&1; then
+      rm -f $PID_FILE
+      die 0 "Service $APP_NAME was successfully stopped"
+    fi
+
+    # Keep waiting
+    sleep 1
+    let count=$count+1
+  done
+
+  # Failed to stop
+  die 2 "Issued SIGTERM but process (#$ppid) is still running; gave up after a 30 seconds wait";
+}
+
+##############################################################################
+# Get status of the service process
+##############################################################################
+do_status () {
+  # Return codes
+  # - 0: Service is running
+  # - 1: Service is not running
+
+  # Check no pidfile
+  if [ ! -f $PID_FILE ]; then
+    die 1 "Service $APP_NAME is not running"
+  fi
+
+  # Check zombie pid
+  read ppid < $PID_FILE
+  if ! ps -p "$ppid" -o "pid=" >/dev/null 2>&1; then
+    rm -f $PID_FILE
+    die 1 "Service $APP_NAME is not running"
+  fi
+  die 0 "Service $APP_NAME is running (#$ppid)"
+}
+
+##############################################################################
+# Main entry point
+##############################################################################
+case "$1" in
+  start)
+    do_start
+    exit $?
+    ;;
+  interactive)
+    do_interactive
+    exit $?
+    ;;
+  stop)
+    do_stop
+    exit $?
+    ;;
+  status)
+    do_status
+    exit $?
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|status|interactive}" >&2
+    exit 3
+    ;;
+esac

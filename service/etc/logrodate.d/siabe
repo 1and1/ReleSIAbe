@@ -1,0 +1,11 @@
+/var/log/siabe.log {
+        daily
+        rotate 168
+        compress
+        copytruncate
+        delaycompress
+        missingok
+        notifempty
+        dateext
+        size 10M
+}

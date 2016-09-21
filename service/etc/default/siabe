@@ -1,0 +1,7 @@
+# SIA BE - REST API default configuration
+
+# Set this to 1 if you want to start the daemon
+START_DAEMON=1
+
+# Default JVM options
+JAVA_OPTS="-Xms256m -Xmx2g -XX:PermSize=64m -XX:MaxPermSize=256m"

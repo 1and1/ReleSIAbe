@@ -1,0 +1,16 @@
+[Unit]
+Description=SIA BackEnd Service
+After=network.target
+
+[Service]
+Type=forking
+PIDFile=/var/run/siabe/siabe.pid
+ExecStart=/usr/bin/siabe start
+ExecStop=/usr/bin/siabe stop
+ExecReload=/usr/bin/siabe reload
+StandardOutput=/var/log/siabe/outputdaemon.log
+KillMode=none
+
+[Install]
+WantedBy=multi-user.target
+Alias=siabe.service

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >
+
+<suite name="RestInterface">
+
+	<test name="ApplicationRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.ApplicationRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="BuildTypeRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.BuildTypeRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="IssueRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.IssueRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="PluginRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.PluginRestInterfaceIT" />
+		</classes>
+	</test>
+
+
+	<test name="ProductRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.ProductRestInterfaceIT" />
+		</classes>
+	</test>
+
+
+	<test name="ProgrammingLanguageRestTest">
+		<classes>
+			<class
+				name="com.oneandone.relesia.test.webservice.ProgrammingLanguageRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="ReleaseRepoTypeRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.ReleaseRepoRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="SCMTypeRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.SCMTypeRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="UserRestTest">
+		<classes>
+			<class name="com.oneandone.relesia.test.webservice.UserRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="WorkApplicationRestTest">
+		<classes>
+			<class
+				name="com.oneandone.relesia.test.webservice.WorkApplicationRestInterfaceIT" />
+		</classes>
+	</test>
+
+	<test name="ErrorRestTest">
+		<classes>
+			<class
+					name="com.oneandone.relesia.test.webservice.ErrorRestInterfaceIT" />
+		</classes>
+	</test>
+
+</suite>
